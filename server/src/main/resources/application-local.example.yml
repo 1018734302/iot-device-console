@@ -1,0 +1,9 @@
+# 使用方式：复制本文件为 application-local.yml，填入真实值后用
+#   mvn spring-boot:run -Dspring-boot.run.profiles=local
+# 启动。application-local.yml 已被 .gitignore 忽略，不会提交到仓库。
+iot:
+  api-token: "请替换为 32 位随机字符串"
+  mqtt:
+    url: tcp://127.0.0.1:1883
+    username: ""
+    password: ""

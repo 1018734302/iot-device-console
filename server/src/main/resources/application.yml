@@ -1,0 +1,25 @@
+server:
+  port: 8081
+  address: 0.0.0.0
+  error:
+    include-message: always
+
+spring:
+  application:
+    name: iot-gateway
+  main:
+    # 关闭 headless，否则 AWT 无法抓屏
+    headless: false
+
+iot:
+  # 生产环境请通过环境变量 API_TOKEN 注入，不要写死
+  api-token: ${API_TOKEN:dev-token-change-me}
+  mqtt:
+    url: tcp://${MQTT_HOST:127.0.0.1}:${MQTT_PORT:1883}
+    client-id: ${MQTT_CLIENT_ID:java-backend}
+    username: ${MQTT_USERNAME:}
+    password: ${MQTT_PASSWORD:}
+  # 设备白名单，未注册的 deviceId 直接 404
+  devices:
+    - light
+    - pc

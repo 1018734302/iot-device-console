@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+<title>IoT 设备运维控制台</title>
+<style>
+  :root {
+    --deep: #184b95;
+    --deep-2: #0f3772;
+    --sky: #59bcdb;
+    --ink: #262626;
+    --muted: #7b8794;
+    --line: #e3eaf3;
+    --bg: #f3f6fb;
+    --card: #ffffff;
+    --danger: #ed5151;
+    --ok: #1aa06d;
+    --radius: 10px;
+    --radius-sm: 7px;
+    --shadow: 0 4px 18px rgba(24, 75, 149, .07);
+    --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.6 var(--font);
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+
+  /* 顶栏 */
+  .topbar { position: sticky; top: 0; z-index: 20; background: rgba(255, 255, 255, .96); border-bottom: 1px solid var(--line); backdrop-filter: saturate(180%) blur(8px); }
+  .bar { height: 60px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ink); min-width: 0; }
+  .logo-mark { width: 30px; height: 30px; flex: 0 0 auto; display: block; }
+  .brand-name { font-size: 15px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+  .token { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .token .label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .token input {
+    width: 190px; max-width: 42vw; padding: 7px 10px;
+    border: 1px solid var(--line); border-radius: var(--radius-sm);
+    background: #f7f9fc; color: var(--ink);
+    font: 12px/1.4 var(--mono); outline: none;
+  }
+  .token input:focus { border-color: var(--sky); background: #fff; }
+
+  /* 头图 */
+  .hero { position: relative; overflow: hidden; background: linear-gradient(118deg, var(--deep-2) 0%, var(--deep) 52%, #2472b8 100%); color: #fff; }
+  .hero::after {
+    content: ""; position: absolute; right: -60px; top: -140px; width: 320px; height: 320px;
+    border-radius: 50%; border: 1px solid rgba(255, 255, 255, .12);
+    box-shadow: 0 0 0 44px rgba(255, 255, 255, .035), 0 0 0 88px rgba(255, 255, 255, .018);
+    pointer-events: none;
+  }
+  .hero-inner { position: relative; z-index: 1; padding: 26px 20px 30px; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
+  .hero h1 { margin: 0 0 6px; font-size: 26px; line-height: 1.25; letter-spacing: .01em; }
+  .hero p { margin: 0; font-size: 13px; color: rgba(255, 255, 255, .78); text-wrap: balance; }
+  .hero-badge {
+    display: flex; align-items: center; gap: 8px; flex: none;
+    font-size: 12px; color: rgba(255, 255, 255, .9);
+    background: rgba(255, 255, 255, .12); border: 1px solid rgba(255, 255, 255, .22);
+    padding: 6px 12px; border-radius: 999px;
+  }
+  .pulse { width: 7px; height: 7px; border-radius: 50%; background: #6ef0b0; }
+  .pulse.bad { background: #ffb3b3; }
+
+  /* 布局 */
+  .grid {
+    display: grid; grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 16px; padding-top: 18px; padding-bottom: 28px;
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 18px 20px; min-width: 0;
+    display: flex; flex-direction: column; grid-column: span 6;
+  }
+  .span-7 { grid-column: span 7; }
+  .span-5 { grid-column: span 5; }
+  .device-card { grid-column: 1 / -1; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .card-head h2 { margin: 0; font-size: 15px; font-weight: 600; position: relative; padding-left: 10px; }
+  .card-head h2::before { content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 13px; background: var(--deep); border-radius: 2px; }
+  .hint { font-size: 12px; color: var(--muted); }
+  .link {
+    border: 0; background: none; color: var(--deep); font: 500 13px var(--font);
+    cursor: pointer; padding: 2px 0;
+  }
+  .link:disabled { opacity: .45; cursor: default; }
+
+  /* 设备状态 */
+  .host-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  .host { font-size: 17px; font-weight: 600; line-height: 1.3; word-break: break-all; }
+  .os { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .chip {
+    flex: none; font: 12px var(--mono); color: var(--deep);
+    background: #eef5fc; border: 1px solid #dbe8f7; border-radius: 999px; padding: 3px 10px;
+  }
+  .metric { margin-bottom: 12px; }
+  .metric-head { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .metric-head b { color: var(--ink); font-weight: 500; font-family: var(--mono); }
+  .meter { height: 6px; background: #edf1f6; border-radius: 999px; overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--sky); border-radius: 999px; transition: width .35s ease; }
+  .meter i.warn { background: #e8a23a; }
+  .meter i.hot { background: var(--danger); }
+  .kv-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); padding-top: 6px; border-top: 1px dashed var(--line); }
+  .kv-row b { color: var(--ink); font-weight: 500; font-family: var(--mono); }
+
+  /* 操作 */
+  .op-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .op {
+    text-align: left; padding: 11px 13px; cursor: pointer;
+    border: 1px solid var(--line); border-radius: var(--radius-sm);
+    background: #f8fafd; color: var(--ink); font-family: var(--font);
+    transition: border-color .15s ease, background .15s ease, transform .05s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .op b { display: block; font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .op span { display: block; font-size: 11px; color: var(--muted); line-height: 1.4; }
+  .op:hover { border-color: var(--sky); background: #f1f9fd; }
+  .op:active { transform: scale(.985); }
+  .op.primary { background: var(--deep); border-color: var(--deep); color: #fff; }
+  .op.primary span { color: rgba(255, 255, 255, .75); }
+  .op.primary:hover { background: var(--deep-2); }
+  .op:disabled { opacity: .5; cursor: default; }
+  .op-sub { margin: 16px 0 8px; font-size: 12px; color: var(--muted); }
+  .tool-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tool {
+    border: 1px solid var(--line); background: #fff; color: var(--ink);
+    border-radius: 999px; padding: 6px 12px; cursor: pointer;
+    font: 500 12px var(--font);
+  }
+  .tool:hover { border-color: var(--sky); color: var(--deep); }
+  .tool:active { transform: scale(.97); }
+
+  /* 截图 */
+  .shot-wrap {
+    height: 300px; flex: none;
+    border: 1px solid var(--line); border-radius: var(--radius-sm);
+    background: #f7f9fc; display: flex; align-items: center; justify-content: center;
+    overflow: hidden; padding: 10px;
+  }
+  .shot-wrap img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; display: block; border-radius: 5px; }
+  .shot-empty { font-size: 12px; color: var(--muted); text-align: center; padding: 0 16px; }
+
+  /* 审计 */
+  .audit { height: 300px; flex: none; overflow: auto; padding-right: 4px; }
+  .audit::-webkit-scrollbar { width: 6px; }
+  .audit::-webkit-scrollbar-thumb { background: #d7e1ee; border-radius: 3px; }
+  .audit::-webkit-scrollbar-track { background: transparent; }
+  .audit-row {
+    display: grid; grid-template-columns: 58px 1fr auto;
+    gap: 10px; align-items: center;
+    padding: 7px 0; border-bottom: 1px dashed var(--line);
+    font-size: 12px;
+  }
+  .audit-row:last-child { border-bottom: 0; }
+  .audit-row .t { font-family: var(--mono); color: var(--muted); }
+  .audit-row .a { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .audit-row .a em { color: var(--muted); font-style: normal; }
+  .audit-row .s { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: #e9f7f1; color: var(--ok); }
+  .audit-row .s.fail { background: #fdeeee; color: var(--danger); }
+  .audit-empty { font-size: 12px; color: var(--muted); padding: 22px 0; text-align: center; }
+
+  /* 演示设备 */
+  .device-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 18px; align-items: center; }
+  .device-row { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .sim-box { justify-self: end; text-align: right; }
+  .led {
+    width: 42px; height: 42px; border-radius: 50%; flex: none;
+    background: #edf1f6; border: 2px solid #e3eaf3;
+    transition: background .18s ease, border-color .18s ease, box-shadow .18s ease;
+  }
+  .led.on { background: var(--sky); border-color: var(--sky); box-shadow: 0 0 0 6px #e6f5fa; }
+  .device-info { margin-right: auto; min-width: 0; }
+  .state { font-size: 15px; font-weight: 600; line-height: 1.3; }
+  .meta { font-size: 12px; color: var(--muted); }
+  .light-actions { display: flex; gap: 8px; }
+  .mini {
+    border: 1px solid var(--line); background: #f8fafd; color: var(--ink);
+    border-radius: var(--radius-sm); padding: 7px 14px; cursor: pointer;
+    font: 500 13px var(--font);
+  }
+  .mini.active { background: var(--deep); border-color: var(--deep); color: #fff; }
+  .mini:active { transform: scale(.97); }
+  .switch { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); cursor: pointer; }
+  .switch input { accent-color: var(--deep); width: 15px; height: 15px; cursor: pointer; }
+  .sim { margin-top: 8px; display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #d5dde7; }
+  .dot.on { background: var(--ok); }
+
+  .footer { border-top: 1px solid var(--line); background: #fff; }
+  .footer .container { padding: 16px 20px; font-size: 12px; color: var(--muted); text-align: center; }
+
+  @media (max-width: 1100px) {
+    .op-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 860px) {
+    .grid { grid-template-columns: 1fr; gap: 14px; padding-top: 14px; }
+    .card, .span-7, .span-5 { grid-column: 1 / -1; }
+    .hero-inner { align-items: flex-start; flex-direction: column; padding: 22px 20px 24px; }
+    .hero h1 { font-size: 22px; }
+    .token .label { display: none; }
+    .token input { width: 150px; max-width: 46vw; }
+    .op-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .device-grid { grid-template-columns: 1fr; gap: 14px; }
+    .sim-box { justify-self: start; text-align: left; }
+    .shot-wrap { height: 240px; }
+    .audit { height: 240px; }
+  }
+  @media (max-width: 620px) {
+    .bar { height: auto; min-height: 56px; flex-wrap: wrap; padding-top: 10px; padding-bottom: 10px; row-gap: 8px; }
+    .brand { flex: 1 1 100%; }
+    .token { flex: 1 1 100%; }
+    .token .label { display: inline; }
+    .token input { width: 100%; max-width: none; flex: 1; }
+    .hero h1 { font-size: 20px; }
+    .hero p { font-size: 12px; }
+    .card { padding: 16px; }
+  }
+  @media (max-width: 420px) {
+    .op { padding: 10px 11px; }
+    .op b { font-size: 12px; }
+    .op span { font-size: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="container bar">
+    <a class="brand" href="/">
+      <svg class="logo-mark" viewBox="0 0 64 64" aria-hidden="true">
+        <rect width="64" height="64" rx="14" fill="#0f4c8a"></rect>
+        <circle cx="32" cy="26" r="8" fill="none" stroke="#59bcdb" stroke-width="4"></circle>
+        <path d="M18 46h28" stroke="#59bcdb" stroke-width="4" stroke-linecap="round"></path>
+      </svg>
+      <span class="brand-name">IoT 设备运维控制台</span>
+    </a>
+    <div class="token">
+      <span class="label">X-Token</span>
+      <input id="token" type="text" autocomplete="off" spellcheck="false" value="dev-token-change-me">
+    </div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="container hero-inner">
+    <div>
+      <h1>设备远程运维</h1>
+      <p>手机与电脑处于同一网络，即可查看状态、执行操作并留存审计记录</p>
+    </div>
+    <div class="hero-badge"><span class="pulse" id="pulse"></span><span id="heroConn">连接中</span></div>
+  </div>
+</section>
+
+<main class="container grid">
+
+  <section class="card span-7">
+    <div class="card-head"><h2>设备状态</h2><span class="hint" id="statsTime">--</span></div>
+    <div class="host-row">
+      <div>
+        <div class="host" id="hostName">--</div>
+        <div class="os" id="osName">--</div>
+      </div>
+      <span class="chip" id="ipAddr">--</span>
+    </div>
+    <div class="metric">
+      <div class="metric-head"><span>CPU</span><b id="cpuText">--</b></div>
+      <div class="meter"><i id="cpuBar"></i></div>
+    </div>
+    <div class="metric">
+      <div class="metric-head"><span>内存</span><b id="memText">--</b></div>
+      <div class="meter"><i id="memBar"></i></div>
+    </div>
+    <div class="metric">
+      <div class="metric-head"><span>磁盘 C:</span><b id="diskText">--</b></div>
+      <div class="meter"><i id="diskBar"></i></div>
+    </div>
+    <div class="kv-row"><span>服务运行时长</span><b id="uptime">--</b></div>
+  </section>
+
+  <section class="card span-5">
+    <div class="card-head"><h2>远程操作</h2><span class="hint">动作白名单</span></div>
+    <div class="op-grid">
+      <button class="op" data-act="beep"><b>远程响铃</b><span>提醒现场人员</span></button>
+      <button class="op" data-act="notify"><b>桌面通知</b><span>弹窗送达消息</span></button>
+      <button class="op" data-act="lock"><b>锁定屏幕</b><span>立即锁定 Windows</span></button>
+      <button class="op" data-act="open"><b>打开网页</b><span>默认浏览器</span></button>
+      <button class="op" data-act="calc"><b>打开计算器</b><span>白名单应用</span></button>
+      <button class="op primary" id="sceneBtn"><b>一键下班</b><span>响铃提醒 + 锁屏</span></button>
+    </div>
+    <div class="op-sub">系统工具</div>
+    <div class="tool-grid">
+      <button class="tool" data-act="taskmgr">任务管理器</button>
+      <button class="tool" data-act="explorer">资源管理器</button>
+      <button class="tool" data-act="desktop">显示桌面</button>
+      <button class="tool" data-act="settings">系统设置</button>
+      <button class="tool" data-act="mute">静音</button>
+    </div>
+  </section>
+
+  <section class="card span-7">
+    <div class="card-head"><h2>远程桌面</h2><button class="link" id="shotBtn">刷新截图</button></div>
+    <div class="shot-wrap" id="shotWrap"><span class="shot-empty">点击「刷新截图」，获取电脑当前桌面</span></div>
+  </section>
+
+  <section class="card span-5">
+    <div class="card-head"><h2>操作审计</h2><span class="hint">最近 8 条 · 存于内存</span></div>
+    <div class="audit" id="auditList"><div class="audit-empty">暂无记录</div></div>
+  </section>
+
+  <section class="card device-card">
+    <div class="card-head"><h2>演示设备 · 灯</h2><span class="hint">ESP32 到货前的模拟执行端</span></div>
+    <div class="device-grid">
+      <div class="device-row">
+        <span class="led" id="led"></span>
+        <div class="device-info">
+          <div class="state" id="stateText">读取中</div>
+          <div class="meta" id="metaText">--</div>
+        </div>
+      </div>
+      <div class="light-actions">
+        <button class="mini" data-light="on">开</button>
+        <button class="mini" data-light="off">关</button>
+        <button class="mini" data-light="toggle">切换</button>
+      </div>
+      <div class="sim-box">
+        <label class="switch"><input type="checkbox" id="simToggle"><span>启用浏览器模拟设备</span></label>
+        <div class="sim"><span class="dot" id="simDot"></span><span id="simText">未连接</span></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="container">IoT 设备运维控制台 · 本地演示环境，数据不出局域网</div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/mqtt@5/dist/mqtt.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var DEVICE_ID = 'light';
+  var TOPIC_CMD = 'home/' + DEVICE_ID + '/cmd';
+  var TOPIC_STATE = 'home/' + DEVICE_ID + '/state';
+  var TOPIC_STATUS = 'home/' + DEVICE_ID + '/status';
+  var TOKEN_KEY = 'iot-token';
+  var DEVICE_LABELS = { light: '演示灯', pc: '电脑' };
+  var ACTION_LABELS = {
+    light: { on: '开灯', off: '关灯', toggle: '切换灯光' },
+    pc: {
+      beep: '远程响铃', notify: '桌面通知', lock: '锁定屏幕', open: '打开网页',
+      calc: '打开计算器', taskmgr: '任务管理器', explorer: '资源管理器',
+      desktop: '显示桌面', settings: '系统设置', mute: '静音切换'
+    }
+  };
+
+  var tokenEl = document.getElementById('token');
+  var heroConn = document.getElementById('heroConn');
+  var pulse = document.getElementById('pulse');
+  var auditList = document.getElementById('auditList');
+  var shotWrap = document.getElementById('shotWrap');
+  var shotBtn = document.getElementById('shotBtn');
+  var ledEl = document.getElementById('led');
+  var lastLightState = null;
+  var stateEl = document.getElementById('stateText');
+  var metaEl = document.getElementById('metaText');
+  var simToggle = document.getElementById('simToggle');
+  var simDot = document.getElementById('simDot');
+  var simText = document.getElementById('simText');
+
+  tokenEl.value = localStorage.getItem(TOKEN_KEY) || tokenEl.value;
+  tokenEl.addEventListener('input', function () {
+    localStorage.setItem(TOKEN_KEY, tokenEl.value.trim());
+    loadStats();
+    loadAudit();
+  });
+
+  function api(path, options) {
+    options = options || {};
+    var headers = options.headers || {};
+    headers['X-Token'] = tokenEl.value.trim();
+    options.headers = headers;
+    return fetch(path, options).then(function (res) {
+      if (res.ok) return res;
+      return res.json().catch(function () { return {}; }).then(function (body) {
+        throw new Error(body.message || body.error || ('HTTP ' + res.status));
+      });
+    });
+  }
+
+  function setConn(text, ok) {
+    heroConn.textContent = text;
+    pulse.classList.toggle('bad', !ok);
+  }
+
+  function gb(bytes) {
+    return (bytes / 1024 / 1024 / 1024).toFixed(1);
+  }
+
+  function setBar(id, percent, text) {
+    var bar = document.getElementById(id + 'Bar');
+    var label = document.getElementById(id + 'Text');
+    var value = Math.max(0, Math.min(100, Math.round(percent)));
+    bar.style.width = value + '%';
+    bar.className = value > 90 ? 'hot' : (value > 70 ? 'warn' : '');
+    label.textContent = text;
+  }
+
+  function formatUptime(seconds) {
+    var d = Math.floor(seconds / 86400);
+    var h = Math.floor((seconds % 86400) / 3600);
+    var m = Math.floor((seconds % 3600) / 60);
+    return (d > 0 ? d + ' 天 ' : '') + h + ' 小时 ' + m + ' 分';
+  }
+
+  function loadStats() {
+    api('/api/pc/stats').then(function (res) { return res.json(); }).then(function (s) {
+      document.getElementById('hostName').textContent = s.host;
+      document.getElementById('osName').textContent = s.os;
+      document.getElementById('ipAddr').textContent = s.ip;
+      setBar('cpu', s.cpu * 100, Math.round(s.cpu * 100) + '%');
+      setBar('mem', s.memUsed / s.memTotal * 100, gb(s.memUsed) + ' / ' + gb(s.memTotal) + ' GB');
+      setBar('disk', s.diskUsed / s.diskTotal * 100, gb(s.diskUsed) + ' / ' + gb(s.diskTotal) + ' GB');
+      document.getElementById('uptime').textContent = formatUptime(s.uptimeSeconds);
+      document.getElementById('statsTime').textContent = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+      setConn('设备在线', true);
+    }).catch(function (err) {
+      setConn(err.message.indexOf('401') >= 0 ? '鉴权失败' : '连接失败', false);
+    });
+  }
+
+  function loadAudit() {
+    api('/api/pc/audit').then(function (res) { return res.json(); }).then(function (list) {
+      var visible = list.filter(function (item) {
+        return !(item.deviceId === 'pc' && item.detail === '已下发');
+      }).slice(0, 8);
+      auditList.innerHTML = '';
+      if (!visible.length) {
+        var empty = document.createElement('div');
+        empty.className = 'audit-empty';
+        empty.textContent = '暂无记录';
+        auditList.appendChild(empty);
+        return;
+      }
+      visible.forEach(function (item) {
+        var row = document.createElement('div');
+        row.className = 'audit-row';
+        var time = document.createElement('span');
+        time.className = 't';
+        time.textContent = item.time;
+        var action = document.createElement('span');
+        action.className = 'a';
+        var device = DEVICE_LABELS[item.deviceId] || item.deviceId;
+        var labels = ACTION_LABELS[item.deviceId] || {};
+        action.textContent = device + ' · ' + (labels[item.action] || item.action);
+        if (!item.ok && item.detail) {
+          var detail = document.createElement('em');
+          detail.textContent = ' ' + item.detail;
+          action.appendChild(detail);
+        }
+        var status = document.createElement('span');
+        status.className = 's' + (item.ok ? '' : ' fail');
+        status.textContent = item.ok ? '成功' : '失败';
+        row.appendChild(time);
+        row.appendChild(action);
+        row.appendChild(status);
+        auditList.appendChild(row);
+      });
+    }).catch(function () { /* 鉴权失败时由状态卡提示 */ });
+  }
+
+  var currentShot = null;
+
+  function loadShot() {
+    shotBtn.disabled = true;
+    api('/api/pc/screenshot').then(function (res) { return res.blob(); }).then(function (blob) {
+      if (currentShot) URL.revokeObjectURL(currentShot);
+      currentShot = URL.createObjectURL(blob);
+      shotWrap.innerHTML = '';
+      var img = new Image();
+      img.src = currentShot;
+      img.alt = '电脑当前桌面截图';
+      shotWrap.appendChild(img);
+    }).catch(function (err) {
+      shotWrap.innerHTML = '';
+      var span = document.createElement('span');
+      span.className = 'shot-empty';
+      span.textContent = '截图失败：' + err.message;
+      shotWrap.appendChild(span);
+    }).then(function () {
+      shotBtn.disabled = false;
+    });
+  }
+
+  shotBtn.addEventListener('click', loadShot);
+
+  function sendCommand(deviceId, action) {
+    return api('/api/devices/' + deviceId + '/commands', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: action })
+    }).then(function (res) { return res.json(); }).then(function () {
+      setTimeout(loadAudit, 400);
+      return true;
+    });
+  }
+
+  function bindActions(selector, deviceId) {
+    document.querySelectorAll(selector).forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var action = btn.dataset.act || btn.dataset.light;
+        sendCommand(deviceId, action).then(function () {
+          if (deviceId === DEVICE_ID) {
+            if (action === 'on') lastLightState = 'on';
+            else if (action === 'off') lastLightState = 'off';
+            else lastLightState = lastLightState === 'on' ? 'off' : 'on';
+            renderDevice(lastLightState, true, Date.now());
+          }
+          setTimeout(loadStats, 300);
+        }).catch(function (err) {
+          setConn('操作失败：' + err.message, false);
+        });
+      });
+    });
+  }
+
+  bindActions('[data-act]', 'pc');
+  bindActions('[data-light]', DEVICE_ID);
+
+  document.getElementById('sceneBtn').addEventListener('click', function () {
+    sendCommand('pc', 'beep').then(function () {
+      return new Promise(function (resolve) { setTimeout(resolve, 700); });
+    }).then(function () {
+      return sendCommand('pc', 'lock');
+    }).catch(function (err) {
+      setConn('场景执行失败：' + err.message, false);
+    });
+  });
+
+  /* ---------- 演示设备状态 ---------- */
+  function renderDevice(state, online, updatedAt) {
+    if (state === 'on' || state === 'off') lastLightState = state;
+    ledEl.classList.toggle('on', state === 'on');
+    stateEl.textContent = state === 'on' ? '已开灯' : (state === 'off' ? '已关灯' : '未知');
+    var onBtn = document.querySelector('[data-light="on"]');
+    var offBtn = document.querySelector('[data-light="off"]');
+    if (onBtn) onBtn.classList.toggle('active', state === 'on');
+    if (offBtn) offBtn.classList.toggle('active', state === 'off');
+    var parts = [online ? '在线' : '离线'];
+    if (updatedAt) parts.push(new Date(updatedAt).toLocaleTimeString('zh-CN', { hour12: false }));
+    metaEl.textContent = parts.join(' · ');
+  }
+
+  function refreshDevice() {
+    api('/api/devices/' + DEVICE_ID).then(function (res) { return res.json(); }).then(function (d) {
+      renderDevice(d.state, d.online, d.updatedAt);
+    }).catch(function () {
+      metaEl.textContent = '读取失败';
+    });
+  }
+
+  /* ---------- 浏览器模拟设备 ---------- */
+  var simClient = null;
+  var simLed = 'off';
+
+  function renderSim(text, connected) {
+    simText.textContent = text;
+    simDot.classList.toggle('on', !!connected);
+  }
+
+  function publishSimState() {
+    if (!simClient || !simClient.connected) return;
+    simClient.publish(TOPIC_STATE, JSON.stringify({ state: simLed }), { qos: 1, retain: true });
+  }
+
+  function startSim() {
+    if (simClient) return;
+    if (typeof mqtt === 'undefined') {
+      renderSim('MQTT.js 未加载，检查网络', false);
+      simToggle.checked = false;
+      return;
+    }
+    var url = 'ws://' + location.hostname + ':8083/mqtt';
+    simClient = mqtt.connect(url, {
+      clientId: 'sim-light-' + Math.random().toString(16).slice(2, 8),
+      clean: true, reconnectPeriod: 3000, connectTimeout: 5000
+    });
+    renderSim('连接中 ...', false);
+
+    simClient.on('connect', function () {
+      renderSim('已连接 EMQX', true);
+      simClient.subscribe(TOPIC_CMD, { qos: 1 });
+      simClient.publish(TOPIC_STATUS, 'online', { qos: 1, retain: true });
+      publishSimState();
+    });
+    simClient.on('message', function (topic, payload) {
+      var cmd = payload.toString().trim();
+      if (cmd === 'on') simLed = 'on';
+      else if (cmd === 'off') simLed = 'off';
+      else if (cmd === 'toggle') simLed = simLed === 'on' ? 'off' : 'on';
+      else return;
+      publishSimState();
+    });
+    simClient.on('reconnect', function () { renderSim('重连中 ...', false); });
+    simClient.on('error', function () { renderSim('连接失败', false); });
+    simClient.on('close', function () { renderSim('连接已关闭', false); });
+  }
+
+  function stopSim() {
+    if (!simClient) return;
+    var client = simClient;
+    simClient = null;
+    client.publish(TOPIC_STATUS, 'offline', { qos: 1, retain: true }, function () {
+      client.end(true);
+    });
+    renderSim('未连接', false);
+  }
+
+  simToggle.addEventListener('change', function () {
+    if (simToggle.checked) startSim();
+    else stopSim();
+  });
+
+  loadStats();
+  loadAudit();
+  refreshDevice();
+  setInterval(loadStats, 5000);
+  setInterval(loadAudit, 10000);
+  setInterval(refreshDevice, 2000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+# Java
+server/target/
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# PlatformIO 构建产物
+firmware/.pio/
+
+# 本地敏感配置，禁止入库
+firmware/include/secrets.h
+server/src/main/resources/application-local.yml
+*.env
+
+# 系统文件
+Thumbs.db
+.DS_Store
+
+# 临时截图目录
+.screenshots/
